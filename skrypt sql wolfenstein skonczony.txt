@@ -1,0 +1,662 @@
+alter session set "_oracle_script"=true;
+DROP USER William;
+DROP USER Anna;
+DROP USER Maks;
+DROP USER Hans;
+DROP ROLE Keeper;
+DROP ROLE Attendant;
+DROP ROLE Guest;
+
+CREATE USER William IDENTIFIED BY W;
+GRANT DBA TO William;
+CONNECT William/W;
+
+DROP SEQUENCE id_gry_seq;
+DROP SEQUENCE id_platformy_seq;
+DROP SEQUENCE id_firmy_seq;
+DROP SEQUENCE id_miasta_seq;
+DROP SEQUENCE id_kraju_seq;
+ALTER TABLE Gry_produkcja DROP CONSTRAINT produkcja_firma;
+ALTER TABLE Gry_wydanie DROP CONSTRAINT gierka;
+ALTER TABLE Gry_wydanie DROP CONSTRAINT wydanie_platforma;
+ALTER TABLE Gry_wydanie DROP CONSTRAINT wydanie_firma;
+ALTER TABLE Platformy DROP CONSTRAINT platforma_firma;
+ALTER TABLE Firmy DROP CONSTRAINT firma_miasto;
+ALTER TABLE Miasta DROP CONSTRAINT miasto_kraj;
+DROP TABLE Zmiany;
+DROP TABLE Kraje;
+DROP TABLE Miasta;
+DROP TABLE Firmy;
+DROP TABLE Platformy;
+DROP TABLE Gry_wydanie;
+DROP TABLE Gry_produkcja;
+DROP VIEW Gry_XX_wieku;
+DROP VIEW Odwiedzanie_firmy;
+DROP INDEX gry_produkcja_klucz_index;
+DROP INDEX gry_wydanie_klucz_index;
+DROP INDEX platformy_klucz_index;
+DROP INDEX firmy_klucz_index;
+DROP INDEX miasta_klucz_index;
+DROP INDEX kraje_klucz_index;
+DROP INDEX gry_produkcja_producent_index;
+DROP INDEX gry_wydanie_wydawca_index;
+DROP INDEX platformy_producent_index;
+DROP INDEX firmy_miasto_index;
+DROP INDEX miasta_kraj_index;
+DROP ROLE Attendant;
+DROP ROLE Guest;
+DROP USER Anna;
+DROP USER Maks;
+DROP USER Hans;
+
+-- Stworzenie sekwencji
+CREATE SEQUENCE id_gry_seq minvalue 1 maxvalue 10000 start with 1 increment by 1 NOCYCLE ORDER;
+CREATE SEQUENCE id_platformy_seq minvalue 1 maxvalue 10000 start with 1 increment by 1 NOCYCLE ORDER;
+CREATE SEQUENCE id_firmy_seq minvalue 1 maxvalue 10000 start with 1 increment by 1 NOCYCLE ORDER;
+CREATE SEQUENCE id_miasta_seq minvalue 1 maxvalue 10000 start with 1 increment by 1 NOCYCLE ORDER;
+CREATE SEQUENCE id_kraju_seq minvalue 1 maxvalue 10000 start with 1 increment by 1 NOCYCLE ORDER;
+
+-- Stworzenie tabel
+CREATE TABLE Gry_produkcja(
+id_gry NUMBER(4, 0) CONSTRAINT gry_produkcja_key PRIMARY KEY,
+nazwa_gry VARCHAR2(150) CONSTRAINT gry_produkcja_nazwa_gry_nn NOT NULL,
+id_glownego_producenta NUMBER(4, 0) CONSTRAINT gry_produkcja_id_glownego_producenta_nn NOT NULL,
+silnik_graficzny VARCHAR2(50)
+) TABLESPACE "USERS";
+COMMENT ON COLUMN Gry_produkcja.id_gry IS 'Klucz główny tabeli Gry_produkcja.';
+COMMENT ON COLUMN Gry_produkcja.nazwa_gry IS 'Tytuł gry.';
+COMMENT ON COLUMN Gry_produkcja.id_glownego_producenta IS 'ID głównego producenta gry. Połączony z kluczem głównym tabeli Firmy.';
+COMMENT ON COLUMN Gry_produkcja.silnik_graficzny IS 'Użyty silnik graficzny.';
+COMMENT ON TABLE Gry_produkcja IS 'Tabela danych o produkcji gier. Posiada klucz zewnętrzny z tabeli Firmy.';
+
+CREATE TABLE Gry_wydanie(
+id_gry NUMBER(4, 0),
+id_platformy NUMBER(4, 0),
+id_wydawcy NUMBER(4, 0) CONSTRAINT gry_wydanie_id_wydawcy_nn NOT NULL,
+rok_wydania NUMBER(4, 0),
+CONSTRAINT gry_wydanie_kompozytowy PRIMARY KEY(id_gry, id_platformy)
+) TABLESPACE "USERS";
+COMMENT ON COLUMN Gry_wydanie.id_gry IS 'Część klucza głównego tabeli Gry_wydanie. Połączony z kluczem głównym tabeli Gry_produkcja.';
+COMMENT ON COLUMN Gry_wydanie.id_platformy IS 'Część klucza głównego tabeli Gry_wydanie. Połączony z kluczem głównym tabeli Platformy.';
+COMMENT ON COLUMN Gry_wydanie.id_wydawcy IS 'ID wydawcy gry. Połączony z kluczem głównym w tabeli Firmy.';
+COMMENT ON COLUMN Gry_wydanie.rok_wydania IS 'Rok wydania.';
+COMMENT ON TABLE Gry_wydanie IS 'Tabela danych o wydaniach gier. Posiada klucz zewnętrzny z tabel Gry_produkcja, Platformy i Firmy.';
+
+CREATE TABLE Platformy(
+id_platformy NUMBER(4, 0) CONSTRAINT platformy_key PRIMARY KEY,
+nazwa_platformy VARCHAR2(50) CONSTRAINT platformy_nazwa_platformy_nn NOT NULL,
+id_glownego_producenta_lub_wlasciciela_pierwszej_wersji NUMBER(4, 0) CONSTRAINT platformy_id_producenta_nn NOT NULL,
+rok_produkcji_pierwszej_wersji NUMBER(4, 0)
+) TABLESPACE "USERS";
+COMMENT ON COLUMN Platformy.id_platformy IS 'Klucz główny tabeli Platformy.';
+COMMENT ON COLUMN Platformy.nazwa_platformy IS 'Nazwa platformy.';
+COMMENT ON COLUMN Platformy.id_glownego_producenta_lub_wlasciciela_pierwszej_wersji IS 'ID głównego producenta lub właściciela pierwszej wersji. Połączony z kluczem głównym w tabeli Firmy.';
+COMMENT ON COLUMN Platformy.rok_produkcji_pierwszej_wersji IS 'Rok produkcji pierwszej wersji.';
+COMMENT ON TABLE Platformy IS 'Tabela danych o platformach. Posiada klucz zewnętrzny z tabeli Firmy.';
+
+CREATE TABLE Firmy(
+id_firmy NUMBER(4, 0) CONSTRAINT firmy_key PRIMARY KEY,
+nazwa_firmy VARCHAR2(50) CONSTRAINT firmy_nazwa_firmy_nn NOT NULL,
+rok_zalozenia NUMBER(4, 0),
+rok_ewentualnego_upadku_lub_wykupienia NUMBER(4, 0),
+obecny_najwyzszy_szef VARCHAR2(100),
+id_miasta_kwater_glownych NUMBER(4, 0) CONSTRAINT firmy_id_miasta_nn NOT NULL
+) TABLESPACE "USERS";
+COMMENT ON COLUMN Firmy.id_firmy IS 'Klucz główny tabeli Firmy.';
+COMMENT ON COLUMN Firmy.nazwa_firmy IS 'Nazwa firmy.';
+COMMENT ON COLUMN Firmy.rok_zalozenia IS 'Rok założenia.';
+COMMENT ON COLUMN Firmy.rok_ewentualnego_upadku_lub_wykupienia IS 'Rok ewentualnego upadku lub wykupienia.';
+COMMENT ON COLUMN Firmy.obecny_najwyzszy_szef IS 'Obecny najwyższy szef.';
+COMMENT ON COLUMN Firmy.id_miasta_kwater_glownych IS 'ID miasta kwater głównych. Połączony z kluczem głównym w tabeli Miasta';
+COMMENT ON TABLE Firmy IS 'Tabela danych o firmach. Posiada klucz zewnętrzny z tabeli Miasta.';
+
+CREATE TABLE Miasta(
+id_miasta NUMBER(4, 0) CONSTRAINT miasta_key PRIMARY KEY,
+nazwa_miasta VARCHAR2(50) CONSTRAINT miasta_nazwa_miasta_nn NOT NULL,
+id_kraju NUMBER(4, 0) CONSTRAINT miasta_id_kraju_nn NOT NULL,
+burmistrz VARCHAR2(100),
+liczba_lotnisk NUMBER(2, 0) DEFAULT 0
+) TABLESPACE "USERS";
+COMMENT ON COLUMN Miasta.id_miasta IS 'Klucz główny tabeli Miasta.';
+COMMENT ON COLUMN Miasta.nazwa_miasta IS 'Nazwa miasta.';
+COMMENT ON COLUMN Miasta.id_kraju IS 'ID kraju, w którym jest to miasto. Połączony z kluczem głównym w tabeli Kraje';
+COMMENT ON COLUMN Miasta.burmistrz IS 'Imię i nazwisko aktualnego burmistrza.';
+COMMENT ON COLUMN Miasta.liczba_lotnisk IS 'Liczba lotnisk w tym mieście.';
+COMMENT ON TABLE Miasta IS 'Tabela danych o miastach. Posiada klucz zewnętrzny z tabeli Kraje.';
+
+CREATE TABLE Kraje(
+id_kraju NUMBER(4, 0) CONSTRAINT kraje_key PRIMARY KEY,
+nazwa_kraju VARCHAR2(50) CONSTRAINT kraje_nazwa_kraju_nn NOT NULL,
+stolica VARCHAR2(50),
+glowa_panstwa VARCHAR2(100),
+hymn_panstwowy VARCHAR2(100),
+kontynent VARCHAR2(50)
+) TABLESPACE "USERS";
+COMMENT ON COLUMN Kraje.id_kraju IS 'Klucz główny tabeli Kraje.';
+COMMENT ON COLUMN Kraje.nazwa_kraju IS 'Nazwa kraju.';
+COMMENT ON COLUMN Kraje.stolica IS 'Nazwa stolicy.';
+COMMENT ON COLUMN Kraje.glowa_panstwa IS 'Imię i nazwisko aktualnej głowy państwa.';
+COMMENT ON COLUMN Kraje.hymn_panstwowy IS 'Tytuł hymnu państwowego.';
+COMMENT ON COLUMN Kraje.kontynent IS 'Nazwa kontynentu, na którym jest większa część głównego terytorium kraju';
+COMMENT ON TABLE Kraje IS 'Tabela danych o krajach.';
+
+CREATE TABLE Zmiany(
+zmieniajacy VARCHAR2(40),
+czas VARCHAR2(30),
+nazwa_operacji VARCHAR2(20),
+nazwa_tabeli VARCHAR2(20),
+wiersz VARCHAR2(10),
+kolumna VARCHAR2(70) DEFAULT NULL,
+stara_wartosc VARCHAR2(150) DEFAULT NULL,
+nowa_wartosc VARCHAR2(150) DEFAULT NULL
+) TABLESPACE "USERS";
+COMMENT ON COLUMN Zmiany.zmieniajacy IS 'Nazwa użytkownika, który dokonał operacji.';
+COMMENT ON COLUMN Zmiany.czas IS 'Data wykonania operacji.';
+COMMENT ON COLUMN Zmiany.nazwa_operacji IS 'Nazwa wykonanej operacji.';
+COMMENT ON COLUMN Zmiany.nazwa_tabeli IS 'Nazwa tabeli, na której dokonano zmiany.';
+COMMENT ON COLUMN Zmiany.wiersz IS 'Klucz główny rekordu, będącego obiektem operacji. W przypadku klucza głównego rozłożonego na kilka kolumn zostaje podane złączenie wczystkich kluczy kompozytowych.';
+COMMENT ON COLUMN Zmiany.kolumna IS 'kolumna, w której przeprowadzana jest operacja. Tylko w przypadku operacji UPDATE';
+COMMENT ON COLUMN Zmiany.stara_wartosc IS 'Stara wartość tego pola. Tylko w przypadku operacji UPDATE';
+COMMENT ON COLUMN Zmiany.nowa_wartosc IS 'Nowa wartość tego pola. Tylko w przypadku operacji UPDATE';
+COMMENT ON TABLE Zmiany IS 'W tej tabeli są informacje o operacjach INSERT, DELETE i UPDATE dokonywanych na tabelach Gry_produkcja, Gry_wydanie, Platformy, Firmy, Miasta, Kraje.';
+
+-- Stworzenie widoków
+CREATE OR REPLACE FORCE VIEW Gry_XX_wieku (nazwa_gry, glowny_producent, silnik_graficzny, platforma, wydawca, rok_wydania) AS 
+SELECT
+  a.nazwa_gry,
+  (SELECT d1.nazwa_firmy FROM Firmy d1 WHERE d1.id_firmy = a.id_glownego_producenta),
+  a.silnik_graficzny,
+  c.nazwa_platformy,
+  (SELECT d1.nazwa_firmy FROM Firmy d1 WHERE d1.id_firmy = b.id_wydawcy),
+  b.rok_wydania
+FROM
+  Gry_produkcja a
+JOIN Gry_wydanie b ON (b.id_gry = a.id_gry)
+JOIN Platformy c ON (c.id_platformy = b.id_platformy)
+WHERE b.rok_wydania < 2000
+WITH READ ONLY;
+
+CREATE OR REPLACE FORCE VIEW Odwiedzanie_firmy (firma, Miasto_kwater_glownych, kraj) AS 
+SELECT
+  d.nazwa_firmy,
+  e.nazwa_miasta,
+  f.nazwa_kraju
+FROM
+  Firmy d
+JOIN Miasta e ON (e.id_miasta = d.id_miasta_kwater_glownych)
+JOIN Kraje f ON (f.id_kraju = e.id_kraju)
+WITH READ ONLY;
+
+-- Wstawianie danych do tabel
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Castle Wolfenstein', 1, 'Castle Wolfenstein Engine');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Beyond Castle Wolfenstein', 1, 'Beyond Castle Wolfenstein Engine');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein 3D', 2, 'Wolfenstein 3D Engine');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein: Spear of Destiny', 2, 'Wolfenstein 3D Engine');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein: Spear of Destiny: Mission 2: Return to Danger', 8, 'Wolfenstein 3D Engine');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein: Spear of Destiny: Mission 3: Ultimate Challenge', 8, 'Wolfenstein 3D Engine');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Return to Castle Wolfenstein', 9, 'id Tech 3');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein: Enemy Territory', 12, 'id Tech 3');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein RPG', 2, 'Wolfenstein RPG Engine');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein', 14, 'id Tech 4');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein: The New Order', 15, 'id Tech 5');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein: The Old Blood', 15, 'id Tech 5');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein II: The New Colossus', 15, 'id Tech 6');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein: Youngblood', 15, 'id Tech 6');
+INSERT INTO Gry_produkcja (id_gry, nazwa_gry, id_glownego_producenta, silnik_graficzny) VALUES (id_gry_seq.NEXTVAL,'Wolfenstein: Cyberpilot', 15, 'id Tech 6');
+
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (1, 1, 1, 1981);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (1, 2, 1, 1982);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (1, 3, 1, 1983);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (1, 4, 1, 1984);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (2, 1, 1, 1984);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (2, 2, 1, 1984);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (2, 3, 1, 1984);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (2, 4, 1, 1985);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 4, 3, 1992);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 5, 5, 1994);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 6, 19, 1994);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 7, 4, 1994);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 8, 5, 1994);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 9, 6, 1995);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 10, 7, 2002);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 11, 10, 2003);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 12, 10, 2009);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 13, 16, 2015);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 14, 10, 2009);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (3, 15, 2, 2009);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (4, 4, 8, 1992);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (5, 4, 8, 1994);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (6, 4, 8, 1994);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (7, 16, 10, 2001);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (7, 17, 11, 2002);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (7, 11, 10, 2003);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (7, 18, 10, 2003);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (8, 16, 10, 2003);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (8, 17, 10, 2003);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (9, 19, 13, 2008);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (9, 20, 13, 2008);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (9, 15, 13, 2009);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (9, 21, 13, 2009);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (10, 16, 10, 2009);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (10, 12, 10, 2009);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (10, 14, 10, 2009);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (11, 16, 16, 2014);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (11, 12, 16, 2014);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (11, 13, 16, 2014);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (11, 14, 16, 2014);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (11, 22, 16, 2014);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (12, 16, 16, 2015);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (12, 13, 16, 2015);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (12, 22, 16, 2015);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (13, 16, 16, 2017);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (13, 13, 16, 2017);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (13, 22, 16, 2017);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (13, 23, 16, 2018);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (14, 16, 16, 2019);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (14, 13, 16, 2019);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (14, 22, 16, 2019);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (14, 23, 16, 2019);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (14, 24, 16, 2019);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (15, 16, 16, 2019);
+INSERT INTO Gry_wydanie (id_gry, id_platformy, id_wydawcy, rok_wydania) VALUES (15, 22, 16, 2019);
+
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Apple II', 17, 1977);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Atari 8-bit', 19, 1979);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Commodore 64', 20, 1982);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'DOS', 18, 1981);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'SNES', 21, 1990);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Jaguar', 19, 1993);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Classic Mac OS', 17, 1984);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'PC-98', 28, 1982);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, '3DO', 22, 1993);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Game Boy Advance', 21, 2001);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Xbox', 18, 2001);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Xbox 360', 18, 2005);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Xbox One', 18, 2013);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'PlayStation 3', 23, 2006);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'iOS', 17, 2007);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Windows', 18, 1985);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Mac OS X', 17, 2001);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'PlayStation 2', 23, 2000);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Java ME', 24, 2001);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'BREW', 25, 2001);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'BlackBerry', 26, 1999);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'PlayStation 4', 23, 2013);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Switch', 21, 2017);
+INSERT INTO Platformy (id_platformy, nazwa_platformy, id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, rok_produkcji_pierwszej_wersji) VALUES (id_platformy_seq.NEXTVAL, 'Stadia', 27, 2019);
+
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Muse Software', 1978, 1987, null, 1);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'id Software', 1991, null, 'Marty Stratton', 2);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Apogee Software', 1987, null, 'Mike Nielsen', 3);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'MacPlay', 1990, null, 'Ron Dimant', 4);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Imagineer', 1986, null, 'Takayuki Kando', 5);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Interplay', 1983, null, 'Herve Caen', 6);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'BAM! Entertainment', 1999, null, 'Ray Musci', 7);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'FormGen', 1987, 1996, null, 8);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Gray Matter Interactive', 1993, 2005, null, 6);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Activision', 1979, null, 'Rob Kostich', 9);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Aspyr Media', 1996, null, 'Michael Rogers', 10);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Splash Damage', 2001, null, 'Richard Jolly', 11);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'EA Mobile', 2004, null, 'Samantha Ryan', 6);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Raven Software', 1988, null, 'Jadesola Orafidiya', 12);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'MachineGames', 2009, null, 'Lars Johansson', 13);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Bethesda Softworks', 1986, null, 'Robert A. Altman', 14);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Apple', 1976, null, 'Arthur D. Levinson', 15);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Microsoft', 1975, null, 'John W. Thompson', 16);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Atari', 1972, null, 'Fred Chesnais', 17);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Commodore', 1954, 1994, null, 18);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Nintendo', 1889, null, 'Shuntaro Furukawa', 19);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'The 3DO Company', 1991, 2003, null, 20);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Sony', 1946, null, 'Shuzo Sumi', 5);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Oracle', 1977, null, 'Larry Ellison', 20);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Qualcomm', 1985, null, 'Mark McLaughlin', 21);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'BlackBerry Limited', 1984, null, 'John S. Chen', 22);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Google', 1998, null, 'Sundar Pichai', 23);
+INSERT INTO Firmy (id_firmy, nazwa_firmy, rok_zalozenia, rok_ewentualnego_upadku_lub_wykupienia, obecny_najwyzszy_szef, id_miasta_kwater_glownych) VALUES (id_firmy_seq.NEXTVAL, 'Nippon Electric', 1899, null, 'Nobuhiro Endo', 5);
+
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Baltimore', 1, 'Jack Young', 1);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Richardson', 1, 'Paul Voelker', 0);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Garland', 1, 'Scott LeMay', 0);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Dallas', 1, 'Eric Johnson', 2);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Tokio', 4, 'Yuriko Koike', 1);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Los Angeles', 1, 'Eric Garcetti', 1);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'San Jose', 1, 'Sam Liccardo', 1);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Scottsdale', 1, 'Jim Lane', 1);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Santa Monica', 1, 'Gleam Davis', 1);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Austin', 1, 'Steve Adler', 1);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Londyn', 2, 'Sadiq Khan', 6);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Middleton', 1, 'Gurdip Brar', 1);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Uppsala', 3, 'Erik Pelling', 0);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Rockville', 1, 'Bridget Newton', 0);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Cupertino', 1, 'Steven Scharf', 0);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Redmond', 1, 'Angela Birney', 0);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Nowy Jork', 1, 'Bill de Blasio', 3);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'West Chester', 1, 'Dianne Herrin', 0);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Kioto', 4, 'Daisaku Kadokawa', 0);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Redwood City', 1, 'Ian Bain', 0);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'San Diego', 1, 'Kevin Faulconer', 1);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Waterloo', 5, 'Dave Javorsky', 0);
+INSERT INTO Miasta (id_miasta, nazwa_miasta, id_kraju, burmistrz, liczba_lotnisk) VALUES (id_miasta_seq.NEXTVAL, 'Mountain View', 1, 'Lisa Matichak', 0);
+
+INSERT INTO Kraje (id_kraju, nazwa_kraju, stolica, glowa_panstwa, hymn_panstwowy, kontynent) VALUES (id_kraju_seq.NEXTVAL, 'Stany Zjednoczone', 'Waszyngton', 'Donald Trump', 'The Star-Spangled Banner', 'Ameryka Polnocna');
+INSERT INTO Kraje (id_kraju, nazwa_kraju, stolica, glowa_panstwa, hymn_panstwowy, kontynent) VALUES (id_kraju_seq.NEXTVAL, 'Wielka Brytania', 'Londyn', 'Elzbieta II', 'God Save the Queen', 'Europa');
+INSERT INTO Kraje (id_kraju, nazwa_kraju, stolica, glowa_panstwa, hymn_panstwowy, kontynent) VALUES (id_kraju_seq.NEXTVAL, 'Szwecja', 'Sztokholm', 'Karol XVI Gustaw', 'Du Gamlia, du fria', 'Europa');
+INSERT INTO Kraje (id_kraju, nazwa_kraju, stolica, glowa_panstwa, hymn_panstwowy, kontynent) VALUES (id_kraju_seq.NEXTVAL, 'Japonia', 'Tokio', 'Naruhito', 'Kimi-ga-yo', 'Azja');
+INSERT INTO Kraje (id_kraju, nazwa_kraju, stolica, glowa_panstwa, hymn_panstwowy, kontynent) VALUES (id_kraju_seq.NEXTVAL, 'Kanada', 'Ottawa', 'Elzbieta II', 'O Canada', 'Ameryka Polnocna');
+
+-- Indeksy
+CREATE INDEX gry_produkcja_producent_index ON Gry_produkcja (id_glownego_producenta) TABLESPACE "USERS";
+CREATE INDEX gry_wydanie_wydawca_index ON Gry_wydanie (id_wydawcy) TABLESPACE "USERS";
+CREATE INDEX platformy_producent_index ON Platformy (id_glownego_producenta_lub_wlasciciela_pierwszej_wersji) TABLESPACE "USERS";
+CREATE INDEX firmy_miasto_index ON Firmy (id_miasta_kwater_glownych) TABLESPACE "USERS";
+CREATE INDEX miasta_kraj_index ON Miasta (id_kraju) TABLESPACE "USERS";
+
+-- Ref constraints
+ALTER TABLE Gry_produkcja ADD CONSTRAINT produkcja_firma FOREIGN KEY (id_glownego_producenta) REFERENCES Firmy(id_firmy) ENABLE;
+
+ALTER TABLE Gry_wydanie ADD CONSTRAINT gierka FOREIGN KEY (id_gry) REFERENCES Gry_produkcja(id_gry) ENABLE;
+ALTER TABLE Gry_wydanie ADD CONSTRAINT wydanie_platforma FOREIGN KEY (id_platformy) REFERENCES Platformy(id_platformy) ENABLE;
+ALTER TABLE Gry_wydanie ADD CONSTRAINT wydanie_firma FOREIGN KEY (id_wydawcy) REFERENCES Firmy(id_firmy) ENABLE;
+
+ALTER TABLE Platformy ADD CONSTRAINT platforma_firma FOREIGN KEY (id_glownego_producenta_lub_wlasciciela_pierwszej_wersji) REFERENCES Firmy(id_firmy) ENABLE;
+
+ALTER TABLE Firmy ADD CONSTRAINT firma_miasto FOREIGN KEY (id_miasta_kwater_glownych) REFERENCES Miasta(id_miasta) ENABLE;
+
+ALTER TABLE Miasta ADD CONSTRAINT miasto_kraj FOREIGN KEY (id_kraju) REFERENCES Kraje(id_kraju) ENABLE;
+
+-- Triggers (a może tigers - tygrysy, bo lubię koty)
+CREATE OR REPLACE TRIGGER gry_produkcja_trigger BEFORE INSERT OR UPDATE OR DELETE ON Gry_produkcja FOR EACH ROW
+DECLARE
+zmieniacz VARCHAR2(40);
+moment VARCHAR2(30);
+BEGIN
+SELECT user, TO_CHAR(sysdate, 'DD/MON/YYYY HH24:MI:SS') INTO zmieniacz, moment FROM dual;
+IF INSERTING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'INSERT', 'Gry_produkcja', :NEW.id_gry);
+ELSIF DELETING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'DELETE', 'Gry_produkcja', :OLD.id_gry);
+ELSIF UPDATING THEN
+  IF UPDATING ('id_gry') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Gry_produkcja', :NEW.id_gry, 'id_gry', :OLD.id_gry, :NEW.id_gry);
+  END IF;
+  IF UPDATING ('nazwa_gry') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Gry_produkcja', :NEW.id_gry, 'nazwa_gry', :OLD.nazwa_gry, :NEW.nazwa_gry);
+  END IF;
+  IF UPDATING ('id_producenta') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Gry_produkcja', :NEW.id_gry, 'id_producenta', :OLD.id_glownego_producenta, :NEW.id_glownego_producenta);
+  END IF;
+  IF UPDATING ('silnik_graficzny') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Gry_produkcja', :NEW.id_gry, 'silnik_graficzny', :OLD.silnik_graficzny, :NEW.silnik_graficzny);
+  END IF;
+END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER gry_wydanie_trigger BEFORE INSERT OR UPDATE OR DELETE ON Gry_wydanie FOR EACH ROW
+DECLARE
+zmieniacz VARCHAR2(40);
+moment VARCHAR2(30);
+BEGIN
+SELECT user, TO_CHAR(sysdate, 'DD/MON/YYYY HH24:MI:SS') INTO zmieniacz, moment FROM dual;
+IF INSERTING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'INSERT', 'Gry_wydanie', :NEW.id_gry||'-'||:NEW.id_platformy);
+ELSIF DELETING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'DELETE', 'Gry_wydanie', :OLD.id_gry||'-'||:OLD.id_platformy);
+ELSIF UPDATING THEN
+  IF UPDATING ('id_gry') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Gry_wydanie', :NEW.id_gry||'-'||:NEW.id_platformy, 'id_gry', :OLD.id_gry, :NEW.id_gry);
+  END IF;
+  IF UPDATING ('id_platformy') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Gry_wydanie', :NEW.id_gry||'-'||:NEW.id_platformy, 'id_platformy', :OLD.id_platformy, :NEW.id_platformy);
+  END IF;
+  IF UPDATING ('id_wydawcy') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Gry_wydanie', :NEW.id_gry||'-'||:NEW.id_platformy, 'id_wydawcy', :OLD.id_wydawcy, :NEW.id_wydawcy);
+  END IF;
+  IF UPDATING ('rok_wydania') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Gry_wydanie', :NEW.id_gry||'-'||:NEW.id_platformy, 'rok_wydania', :OLD.rok_wydania, :NEW.rok_wydania);
+  END IF;
+END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER platformy_trigger BEFORE INSERT OR UPDATE OR DELETE ON Platformy FOR EACH ROW
+DECLARE
+zmieniacz VARCHAR2(40);
+moment VARCHAR2(30);
+BEGIN
+SELECT user, TO_CHAR(sysdate, 'DD/MON/YYYY HH24:MI:SS') INTO zmieniacz, moment FROM dual;
+IF INSERTING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'INSERT', 'Platformy', :NEW.id_platformy);
+ELSIF DELETING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'DELETE', 'Platformy', :OLD.id_platformy);
+ELSIF UPDATING THEN
+  IF UPDATING ('id_platformy') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Platformy', :NEW.id_platformy, 'id_platformy', :OLD.id_platformy, :NEW.id_platformy);
+  END IF;
+  IF UPDATING ('nazwa_platformy') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Platformy', :NEW.id_platformy, 'nazwa_platformy', :OLD.nazwa_platformy, :NEW.nazwa_platformy);
+  END IF;
+  IF UPDATING ('id_glownego_producenta_lub_wlasciciela_pierwszej_wersji') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Platformy', :NEW.id_platformy, 'id_glownego_producenta_lub_wlasciciela_pierwszej_wersji', :OLD.id_glownego_producenta_lub_wlasciciela_pierwszej_wersji, :NEW.id_glownego_producenta_lub_wlasciciela_pierwszej_wersji);
+  END IF;
+  IF UPDATING ('rok_produkcji_pierwszej_wersji') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Platformy', :NEW.id_platformy, 'rok_produkcji_pierwszej_wersji', :OLD.rok_produkcji_pierwszej_wersji, :NEW.rok_produkcji_pierwszej_wersji);
+  END IF;
+END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER firmy_trigger BEFORE INSERT OR UPDATE OR DELETE ON Firmy FOR EACH ROW
+DECLARE
+zmieniacz VARCHAR2(40);
+moment VARCHAR2(30);
+BEGIN
+SELECT user, TO_CHAR(sysdate, 'DD/MON/YYYY HH24:MI:SS') INTO zmieniacz, moment FROM dual;
+IF INSERTING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'INSERT', 'Firmy', :NEW.id_firmy);
+ELSIF DELETING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'DELETE', 'Firmy', :OLD.id_firmy);
+ELSIF UPDATING THEN
+  IF UPDATING ('id_firmy') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Firmy', :NEW.id_firmy, 'id_firmy', :OLD.id_firmy, :NEW.id_firmy);
+  END IF;
+  IF UPDATING ('nazwa_firmy') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Firmy', :NEW.id_firmy, 'nazwa_firmy', :OLD.nazwa_firmy, :NEW.nazwa_firmy);
+  END IF;
+  IF UPDATING ('rok_zalozenia') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Firmy', :NEW.id_firmy, 'rok_zalozenia', :OLD.rok_zalozenia, :NEW.rok_zalozenia);
+  END IF;
+  IF UPDATING ('rok_ewentualnego_upadku_lub_wykupienia') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Firmy', :NEW.id_firmy, 'rok_ewentualnego_upadku_lub_wykupienia', :OLD.rok_ewentualnego_upadku_lub_wykupienia, :NEW.rok_ewentualnego_upadku_lub_wykupienia);
+  END IF;
+  IF UPDATING ('obecny_najwyzszy_szef') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Firmy', :NEW.id_firmy, 'obecny_najwyzszy_szef', :OLD.obecny_najwyzszy_szef, :NEW.obecny_najwyzszy_szef);
+  END IF;
+  IF UPDATING ('id_miasta_kwater_glownych') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Firmy', :NEW.id_firmy, 'id_miasta_kwater_glownych', :OLD.id_miasta_kwater_glownych, :NEW.id_miasta_kwater_glownych);
+  END IF;
+END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER miasta_trigger BEFORE INSERT OR UPDATE OR DELETE ON Miasta FOR EACH ROW
+DECLARE
+zmieniacz VARCHAR2(40);
+moment VARCHAR2(30);
+BEGIN
+SELECT user, TO_CHAR(sysdate, 'DD/MON/YYYY HH24:MI:SS') INTO zmieniacz, moment FROM dual;
+IF INSERTING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'INSERT', 'Miasta', :NEW.id_miasta);
+ELSIF DELETING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'DELETE', 'Miasta', :OLD.id_miasta);
+ELSIF UPDATING THEN
+  IF UPDATING ('id_miasta') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Miasta', :NEW.id_miasta, 'id_miasta', :OLD.id_miasta, :NEW.id_miasta);
+  END IF;
+  IF UPDATING ('nazwa_miasta') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Miasta', :NEW.id_miasta, 'nazwa_miasta', :OLD.nazwa_miasta, :NEW.nazwa_miasta);
+  END IF;
+  IF UPDATING ('id_kraju') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Miasta', :NEW.id_miasta, 'id_kraju', :OLD.id_kraju, :NEW.id_kraju);
+  END IF;
+  IF UPDATING ('burmistrz') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Miasta', :NEW.id_miasta, 'burmistrz', :OLD.burmistrz, :NEW.burmistrz);
+  END IF;
+  IF UPDATING ('liczba_lotnisk') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Miasta', :NEW.id_miasta, 'liczba_lotnisk', :OLD.liczba_lotnisk, :NEW.liczba_lotnisk);
+  END IF;
+END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER kraje_trigger BEFORE INSERT OR UPDATE OR DELETE ON Kraje FOR EACH ROW
+DECLARE
+zmieniacz VARCHAR2(40);
+moment VARCHAR2(30);
+BEGIN
+SELECT user, TO_CHAR(sysdate, 'DD/MON/YYYY HH24:MI:SS') INTO zmieniacz, moment FROM dual;
+IF INSERTING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'INSERT', 'Kraje', :NEW.id_kraju);
+ELSIF DELETING THEN
+  INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz)
+  VALUES (zmieniacz, moment, 'DELETE', 'Kraje', :OLD.id_kraju);
+ELSIF UPDATING THEN
+  IF UPDATING ('id_kraju') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Kraje', :NEW.id_kraju, 'id_kraju', :OLD.id_kraju, :NEW.id_kraju);
+  END IF;
+  IF UPDATING ('nazwa_kraju') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Kraje', :NEW.id_kraju, 'nazwa_kraju', :OLD.nazwa_kraju, :NEW.nazwa_kraju);
+  END IF;
+  IF UPDATING ('stolica') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Kraje', :NEW.id_kraju, 'stolica', :OLD.stolica, :NEW.stolica);
+  END IF;
+  IF UPDATING ('glowa_panstwa') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Kraje', :NEW.id_kraju, 'glowa_panstwa', :OLD.glowa_panstwa, :NEW.glowa_panstwa);
+  END IF;
+  IF UPDATING ('hymn_panstwowy') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Kraje', :NEW.id_kraju, 'hymn_panstwowy', :OLD.hymn_panstwowy, :NEW.hymn_panstwowy);
+  END IF;
+  IF UPDATING ('kontynent') THEN
+    INSERT INTO Zmiany(zmieniajacy, czas, nazwa_operacji, nazwa_tabeli, wiersz, kolumna, stara_wartosc, nowa_wartosc)
+    VALUES (zmieniacz, moment, 'UPDATE', 'Kraje', :NEW.id_kraju, 'kontynent', :OLD.kontynent, :NEW.kontynent);
+  END IF;
+END IF;
+END;
+/
+alter session set "_oracle_script"=true;
+-- Stworzenie ról
+CREATE ROLE Keeper;
+CREATE ROLE Attendant;
+CREATE ROLE Guest;
+
+-- Przyznanie uprawnień do roli Keeper
+GRANT SELECT ON Gry_XX_wieku TO Keeper;
+GRANT SELECT ON Odwiedzanie_firmy TO Keeper;
+GRANT SELECT ON Zmiany TO Keeper;
+GRANT SELECT ON Gry_produkcja TO Keeper;
+GRANT SELECT ON Gry_wydanie TO Keeper;
+GRANT SELECT ON Platformy TO Keeper;
+GRANT SELECT ON Firmy TO Keeper;
+GRANT SELECT ON Miasta TO Keeper;
+GRANT SELECT ON Kraje TO Keeper;
+GRANT INSERT ON Gry_produkcja TO Keeper;
+GRANT INSERT ON Gry_wydanie TO Keeper;
+GRANT INSERT ON Platformy TO Keeper;
+GRANT INSERT ON Firmy TO Keeper;
+GRANT INSERT ON Miasta TO Keeper;
+GRANT INSERT ON Kraje TO Keeper;
+GRANT DELETE ON Gry_produkcja TO Keeper;
+GRANT DELETE ON Gry_wydanie TO Keeper;
+GRANT DELETE ON Platformy TO Keeper;
+GRANT DELETE ON Firmy TO Keeper;
+GRANT DELETE ON Miasta TO Keeper;
+GRANT DELETE ON Kraje TO Keeper;
+GRANT UPDATE ON Gry_produkcja TO Keeper;
+GRANT UPDATE ON Gry_wydanie TO Keeper;
+GRANT UPDATE ON Platformy TO Keeper;
+GRANT UPDATE ON Firmy TO Keeper;
+GRANT UPDATE ON Miasta TO Keeper;
+GRANT UPDATE ON Kraje TO Keeper;
+
+-- Przyznanie uprawnień do roli Attendant
+GRANT SELECT ON Gry_XX_wieku TO Attendant;
+GRANT SELECT ON Odwiedzanie_firmy TO Attendant;
+GRANT SELECT ON Zmiany TO Attendant;
+GRANT SELECT ON Gry_produkcja TO Attendant;
+GRANT SELECT ON Gry_wydanie TO Attendant;
+GRANT SELECT ON Platformy TO Attendant;
+GRANT SELECT ON Firmy TO Attendant;
+GRANT SELECT ON Miasta TO Attendant;
+GRANT SELECT ON Kraje TO Attendant;
+GRANT INSERT ON Gry_produkcja TO Attendant;
+GRANT INSERT ON Gry_wydanie TO Attendant;
+GRANT INSERT ON Platformy TO Attendant;
+GRANT INSERT ON Firmy TO Attendant;
+GRANT INSERT ON Miasta TO Attendant;
+GRANT INSERT ON Kraje TO Attendant;
+GRANT UPDATE ON Firmy TO Attendant;
+GRANT UPDATE ON Miasta TO Attendant;
+GRANT UPDATE ON Kraje TO Attendant;
+
+-- Przyznanie uprawnień do roli Guest
+GRANT SELECT ON Gry_XX_wieku TO Guest;
+GRANT SELECT ON Odwiedzanie_firmy TO Guest;
+GRANT SELECT ON Zmiany TO Guest;
+GRANT SELECT ON Gry_produkcja TO Guest;
+GRANT SELECT ON Gry_wydanie TO Guest;
+GRANT SELECT ON Platformy TO Guest;
+GRANT SELECT ON Firmy TO Guest;
+GRANT SELECT ON Miasta TO Guest;
+GRANT SELECT ON Kraje TO Guest;
+
+-- Stworzenie użytkowników
+CREATE USER Anna IDENTIFIED BY A;
+CREATE USER Maks IDENTIFIED BY M;
+CREATE USER Hans IDENTIFIED BY H;
+grant connect,resource to Anna;
+grant connect,resource to Maks;
+grant connect,resource to Hans;
+
+-- Przypisanie ról użytkownikom
+GRANT Keeper TO Anna;
+GRANT Attendant TO Maks;
+GRANT Guest TO Hans;
